@@ -7,7 +7,7 @@ start_date <- as.Date("2022-01-01")
 end_date <- as.Date("2023-07-27")
 
 
-rD <- rsDriver(browser="firefox", port=4560L, verbose=F, chromever = NULL)
+rD <- rsDriver(browser="firefox", port=4570L, verbose=F, chromever = NULL)
 remDr <- rD[["client"]]
 #remDr$open()
 
@@ -18,7 +18,7 @@ remDr$navigate(url)
 data <- data.frame(header = "", link = "", desc = "", date = "", author = "")
 
 date_1 <- start_date
-date_2 <- date_1+2
+date_2 <- date_1+1
 
 repeat{
   
@@ -30,24 +30,24 @@ repeat{
   offers <- page %>% html_elements(".css-1l4w6pd")
   
   data_page <- data.frame(
-    header = offers %>% html_element("h4") %>% html_text2(),
+    header = offers %>% html_element(".css-nsjm9t") %>% html_text2(),
     link = offers %>% html_element("a") %>% html_attr("href"),
-    desc = offers %>% html_element("p") %>% html_text2(),
+    desc = offers %>% html_element(".css-e5tzus") %>% html_text2(),
     date = offers %>% html_element(".css-y0k07m") %>% html_text2(),
-    author = offers %>% html_nodes("p:last-of-type") %>% html_text2()
+    author = offers %>% html_element(".css-1engk30") %>% html_text2()
   )
   
   data <- rbind(data, data_page)
   
   date_1 <- date_2+1
-  date_2 <- date_1+2
+  date_2 <- date_1+1
   print(date_1)
 
   
   if(date_1 >= end_date) break
 }
 
-write.csv(data, "nyt_archive_Ukraine.csv")
+write.csv(data, "nyt_archive_Ukraine_2.csv")
 
 remDr$close()
 rD$client$closeServer()
