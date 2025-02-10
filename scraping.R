@@ -12,19 +12,18 @@ remDr$open()
 
 # go to page
 remDr$maxWindowSize()
-remDr$navigate(url2)
+remDr$navigate(url)
 
-data_israel <- data.frame(header = "", link = "", desc = "", date = "", author = "")
+data <- data.frame(header = "", link = "", desc = "", date = "", author = "")
 
 
-for(i in 1:last_page){
-  
-  page_url <- paste0(url2,i)
+  page_url <- paste0(url,10)
   remDr$navigate(page_url)
   Sys.sleep(10)
   
+repeat{
   page <- read_html(remDr$getPageSource()[[1]])
-  offers <- page %>% html_elements(".css-18yolpw")
+  offers_A <- page %>% html_elements(".css-18yolpw")
   
   # TRY: after 10 pages, scroll down several times (in a loop)
   # save after each chunk of data 
@@ -34,12 +33,18 @@ for(i in 1:last_page){
   webElem <- remDr$findElement("css", "body")
   
   webElem$sendKeysToElement(list(key = "end"))
-  for(j in 1:5){
-    webElem$sendKeysToElement(list(key = "up_arrow"))
-  }
   Sys.sleep(5)
   
+  page <- read_html(remDr$getPageSource()[[1]])
+  offers_B <- page %>% html_elements(".css-18yolpw")
   
+  print(paste("A", length(offers_A)))
+  print(paste("B", length(offers_B)))
+ 
+  if(length(offers_A) == length(offers_B)) break
+}
+  
+  offers <- offers_B
   data_page <- data.frame(
     header = offers %>% html_element("h3") %>% html_text2(),
     link = offers %>% html_element("a") %>% html_attr("href"),
@@ -48,11 +53,12 @@ for(i in 1:last_page){
     author = offers %>% html_nodes("p:last-of-type") %>% html_text2()
   )
   
-  data_israel <- rbind(data, data_page)
-  
-}
+  data <- rbind(data, data_page)
+  # scraped on 06.02.2025
 
-length(unique(data_page$date))
+  
+  
+nrow(unique(data_page))
 
 remDr$close()
 rD$client$closeServer()
@@ -60,5 +66,9 @@ rD$client$closeServer()
 data_israel <- unique(data_israel)
 nrow(unique(data_page))
 
-write.csv(data, "nyt_Ukraine_news.csv")
+write.csv(data_page, "nyt_Ukraine_news.csv")
 write.csv(data_israel, "nyt_Israel_news.csv")
+
+
+length(unique(data_page$date))
+nrow(data_page)/484 # two articles per day
