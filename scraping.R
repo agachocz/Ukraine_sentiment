@@ -72,3 +72,31 @@ write.csv(data_israel, "nyt_Israel_news.csv")
 
 length(unique(data_page$date))
 nrow(data_page)/484 # two articles per day
+
+
+# joining data
+data_1 <- read.csv("nyt_archive_Ukraine_2.csv")
+data_2 <- read.csv("nyt_archive_Ukraine_3.csv")
+
+data_3 <- data_2[1960:2062,] %>% mutate(date = if_else(str_detect(date, "ago"), "Feb. 11", date)) %>%
+  mutate(date = paste(date, "2025"))
+data_2 <- data_2[1:1959,]
+
+library(lubridate)
+
+
+data_UKR <- rbind(data_1, data_2, data_3) %>% unique() %>% select(-X) %>% slice(-1) %>%
+  mutate(date = str_remove(date, "\\.")) %>% 
+  mutate(date = str_remove(date, "\\,")) %>% 
+  mutate(date = mdy(date)) %>% 
+  mutate(author = str_remove(author, "By "))
+
+summary(data_UKR)  
+ukr_by_month <- data_UKR %>% mutate(month = str_sub(date, 1, 7)) %>%
+  mutate(month = as.Date(paste0(month, "-01"))) %>%
+  group_by(month) %>% tally() %>% 
+  ggplot(aes(x = month, y = n)) + geom_line()
+
+write.csv(data_UKR, "NYT_Ukraine_full_data.csv")
+
+length(unique(data_UKR$header))
