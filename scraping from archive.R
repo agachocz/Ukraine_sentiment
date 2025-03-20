@@ -6,8 +6,9 @@ url_2 <- "&lang=en&query=Ukraine&sections=World%7Cnyt%3A%2F%2Fsection%2F70e865b6
 start_date <- as.Date("2022-01-01")
 end_date <- as.Date("2023-07-27")
 
-start_date <- as.Date("2023-07-27")
-end_date <- as.Date("2025-02-11")
+# new batch
+start_date <- as.Date("2025-02-11")
+end_date <- as.Date("2025-03-19")
 
 
 rD <- rsDriver(browser="firefox", port=4570L, verbose=F, chromever = NULL)
@@ -16,7 +17,7 @@ remDr <- rD[["client"]]
 
 # go to page
 remDr$maxWindowSize()
-remDr$navigate(url)
+remDr$navigate(url_1)
 
 data <- data.frame(header = "", link = "", desc = "", date = "", author = "")
 
@@ -50,7 +51,7 @@ repeat{
   if(date_1 >= end_date) break
 }
 
-write.csv(data, "nyt_archive_Ukraine_3.csv")
+write.csv(data, "nyt_archive_Ukraine_4.csv")
 
 remDr$close()
 rD$client$closeServer()
