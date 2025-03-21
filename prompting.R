@@ -20,7 +20,8 @@ data_UKR <- rbind(data_1, data_2, data_3, data_4) %>% unique() %>% select(-X) %>
   mutate(date = str_remove(date, "\\.")) %>% 
   mutate(date = str_remove(date, "\\,")) %>% 
   mutate(date = mdy(date)) %>% 
-  mutate(author = str_remove(author, "By "))
+  mutate(author = str_remove(author, "By ")) %>%
+  filter(!is.na(date))
 
 summary(data_UKR)  
 ukr_by_month <- data_UKR %>% mutate(month = str_sub(date, 1, 7)) %>%
@@ -41,19 +42,22 @@ full_data <- read.csv("NYT_Ukraine_full_data.csv") %>% select(-X, -link) %>%
 full_data$id <- 1:nrow(full_data)
 
 # simple prompt for sentiment
-prompt_sent <- "You will receive a snippet of a news article. 
-           Assign the sentiment of the article on a scale from -5 (strongly negative)
-           to 5 (strongly positive). Return just the sentiment value as a single number."
+prompt_sent <- c("You will receive a snippet of a news article about a war between Russia and Ukraine.",
+           "Assign the sentiment of the article as positive (+), negative (-), or neutral/ambiguous (0).",
+           "Return just the sentiment as a single character: -, +, or 0.")
+
+prompt_sent <- prompt_sent %>% paste(collapse = " ")
 
 # prompt with reasoning
-prompt_reason <- "You will receive a snippet of a news article and you need to analyse its sentiment.
-           Assign the sentiment of the article as positive (+), negative (-), or neutral/ambiguous (0)
-           and provide your reasoning in one or two sentences.
-           Return the sentiment value as a single number and your reasoning in form of a JSON with keys: 
-           sentiment and reasoning.
+prompt_reason <- c("You will receive a snippet of a news article about a war between Russia and Ukraine and you need to analyse its sentiment.",
+           "Assign the sentiment of the article as positive (+), negative (-), or neutral/ambiguous (0)",
+           "and provide your reasoning in one or two sentences.",
+           "Return the sentiment value as a single character (-, +, or 0) and short explanation of your reasoning after a colon.", 
+           "Example:",
+           "INPUT: A year after Russian aggression, many businesses omit sanctions and restart activity in the country.",
+           "OUTPUT: -: Since sanctions don't stop business activity, they are not likely to stop the aggression.")
 
-Example: 
-INPUT: "
+prompt_reason <- prompt_reason %>% paste(collapse = " ")
 
 # prompt war/peace with reasoning
 
@@ -63,11 +67,12 @@ INPUT: "
 
 
 articles <- full_data$text
+n <- length(articles)
 
 # preparing batches from NYT articles
 text <- ''
-for (i in 2001:length(articles)){
-  json <- paste0('{"custom_id": "req-sent-',i,'", "method": "POST",
+for (i in 1:n){
+  json <- paste0('{"custom_id": "req-simple-',i,'", "method": "POST",
                  "url": "/v1/chat/completions", 
                  "body": {"model": "gpt-4o-mini", 
                  "messages": [{"role": "system", "content": "',
@@ -82,43 +87,129 @@ for (i in 2001:length(articles)){
 # write in jsonl file
 text <- str_trim(text, side = "both")
 utf8 <- enc2utf8(text)
-con <- file("batches/sent_Ukraine_3.jsonl", open = "w+", encoding = "UTF-8")
+con <- file("batches/sent_simple.jsonl", open = "w+", encoding = "UTF-8")
 writeLines(utf8, con = con)
 close(con)
+
+
+
+# preparing batches from NYT articles - REASONING
+text <- ''
+for (i in 1:n){
+  json <- paste0('{"custom_id": "req-reason-',i,'", "method": "POST",
+                 "url": "/v1/chat/completions", 
+                 "body": {"model": "gpt-4o-mini",
+                 "messages": [{"role": "system", "content": "',
+                 prompt_reason, '"},
+                 {"role": "user", "content": "', articles[i], '"}],
+                 "temperature": 0.00,
+                 "max_tokens": 2000}}')
+  json <- str_remove_all(json, "\n") %>% str_squish()
+  text <- paste(text, '\n', json)
+}
+
+# write in jsonl file
+text <- str_trim(text, side = "both")
+utf8 <- enc2utf8(text)
+con <- file("batches/sent_reason.jsonl", open = "w+", encoding = "UTF-8")
+writeLines(utf8, con = con)
+close(con)
+
+
+
+# sample of articles for human annotation
+
+sample <- full_data %>% slice_sample(n = 100) %>% select(id, text)
+write.csv(sample, "human sample.csv")
+
+sample_done <- read.csv("human sample.csv", sep = ";", encoding = "UTF-8")
+colnames(sample_done) <- c("nr", "id", "text", "sentiment")
+
+sample_done <- sample_done %>% select(id, human = sentiment)
 
 
 # read the results
 
 library(jsonlite)
 
-filenames <- list.files(path = "GPT sent", full.names = TRUE)
-first = TRUE
+# SIMPLE
+filename <- "GPT sent/simple sent.jsonl"
 
-for(i in 1:length(filenames)){
-  con <- file(filenames[i], open = "r", encoding = "UTF-8")
+  con <- file(filename, open = "r", encoding = "UTF-8")
   file <- readLines(con = con)
   close(con)
   
-  res_df <- lapply(file, function(x){
+  sent_simple <- lapply(file, function(x){
     results <- fromJSON(x)
     df <- data.frame(
       id = results$custom_id,
       text = results[["response"]][["body"]][["choices"]][["message"]][["content"]]
     )}) %>% bind_rows()
   
-  if(first) {
-    results_table_sent <- res_df
-    first <- FALSE
-  } else { results_table_sent <- rbind(results_table_sent, res_df) }
+
+
+sent_simple <- sent_simple %>% 
+  mutate(id = as.numeric(str_remove(id, "req-simple-"))) %>%
+  rename(simple = text)
+
+
+# WITH REASONING
+filename <- "GPT sent/reason sent.jsonl"
+
+con <- file(filename, open = "r", encoding = "UTF-8")
+file <- readLines(con = con)
+close(con)
+
+sent_reason <- lapply(file, function(x){
+  results <- fromJSON(x)
+  df <- data.frame(
+    id = results$custom_id,
+    text = results[["response"]][["body"]][["choices"]][["message"]][["content"]]
+  )}) %>% bind_rows()
+
+split_reason <- function(text, which){ # 1 for sentiment, 2 for explanation
+  str_split(text, ":")[[1]][which]
 }
 
-results_table_sent <- results_table_sent %>% 
-  mutate(sentiment = as.numeric(results_table_sent$text),
-         id = str_remove(id, "req-sent-"))
+sent_reason$reason <- sapply(sent_reason$text, split_reason, which = 1)
+sent_reason$expl <- sapply(sent_reason$text, split_reason, which = 2)
+
+sent_reason <- sent_reason %>% 
+  mutate(id = as.numeric(str_remove(id, "req-reason-"))) %>%
+  select(id, reason, expl)
+
+
+
 
 # join with article data
-sentiment_data <- results_table_sent %>% select(id, sentiment) %>% mutate(id = as.numeric(id)) %>%
-  left_join(full_data, by = "id") %>% mutate(date = as.Date(date, format = "%Y-%m-%d"))
+sentiment_data <- full_data %>% left_join(sent_simple, by = "id") %>% 
+  left_join(sent_reason, by = "id") %>% left_join(sample_done, by = "id") %>% 
+  mutate(date = as.Date(date, format = "%Y-%m-%d")) %>%
+  mutate(gpt_match = if_else(simple == reason, TRUE, FALSE))
+  
+sum(sentiment_data$gpt_match)/4972
+
+unique(sentiment_data$simple)
+unique(sentiment_data$reason)
+
+
+# check which is more aligned with human annotation
+
+sentiment_data %>% filter(!is.na(human)) %>%
+  mutate(simple_match = if_else(simple == human, TRUE, FALSE),
+         reason_match = if_else(reason == human, TRUE, FALSE)) %>%
+  summarise(
+    simple_acc = sum(simple_match)/100,
+    reason_acc = sum(reason_match)/100,
+    gpt_match = sum(gpt_match)/100,
+    n = n()
+  )
+
+N <- nrow(sentiment_data)
+sentiment_data %>% group_by(simple) %>% tally() %>% mutate(prop = n/N)
+sentiment_data %>% group_by(reason) %>% tally() %>% mutate(prop = n/N)
+sentiment_data %>% filter(!is.na(human)) %>% group_by(human) %>% tally() %>% mutate(prop = n/100)
+
 
 # aggregate by month
 sentiment_monthly <- sentiment_data %>% mutate(month = substr(date, 1, 7)) %>% 
