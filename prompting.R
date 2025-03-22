@@ -156,6 +156,48 @@ close(con)
 
 
 
+# prompt for Ukraine vs Russia
+prompt_sides <- c("You will receive a snippet of a news article about a war between Russia and Ukraine.",
+                "Decide which side would benefit or take advantage of described events.",
+                "Assign '+' in case of events beneficial for Ukraine, '-' if they benefit Russia, or '0' if it is hard to tell.",
+                "Return a single character: -, +, or 0.")
+
+prompt_sides <- prompt_sides %>% paste(collapse = " ")
+
+prompt_sides_alt <- c("You will receive a snippet of a news article about a war between Russia and Ukraine.",
+                  "Decide which side would benefit or take advantage of described events.",
+                  "Assign '-' in case of events beneficial for Ukraine, '+' if they benefit Russia, or '0' if it is hard to tell.",
+                  "Return a single character: -, +, or 0.")
+
+prompt_sides_alt <- prompt_sides_alt %>% paste(collapse = " ")
+
+# preparing batches from NYT articles - Ukraine vs Russia
+text <- ''
+for (i in 1:n){
+  json <- paste0('{"custom_id": "req-war-',i,'", "method": "POST",
+                 "url": "/v1/chat/completions", 
+                 "body": {"model": "gpt-4o-mini",
+                 "messages": [{"role": "system", "content": "',
+                 prompt_sides_alt, '"},
+                 {"role": "user", "content": "', articles[i], '"}],
+                 "temperature": 0.00,
+                 "max_tokens": 2000}}')
+  json <- str_remove_all(json, "\n") %>% str_squish()
+  text <- paste(text, '\n', json)
+}
+
+# write in jsonl file
+text <- str_trim(text, side = "both")
+utf8 <- enc2utf8(text)
+con <- file("batches/sent_sides_alt.jsonl", open = "w+", encoding = "UTF-8")
+writeLines(utf8, con = con)
+close(con)
+
+
+
+
+
+
 
 # sample of articles for human annotation
 
