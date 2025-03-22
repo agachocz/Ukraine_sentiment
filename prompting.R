@@ -116,6 +116,46 @@ writeLines(utf8, con = con)
 close(con)
 
 
+# prompt for war vs peace
+prompt_war <- c("You will receive a snippet of a news article about a war between Russia and Ukraine.",
+                 "Decide if the events described in this article suggest an increase in conflict intensity or a change towards peace.",
+                 "Assign '+' in case of events making peace more likely, '-' if the described events increase conflict, or '0' if it is hard to tell.",
+                 "Return a single character: -, +, or 0.")
+
+prompt_war <- prompt_war %>% paste(collapse = " ")
+
+prompt_war_alt <- c("You will receive a snippet of a news article about a war between Russia and Ukraine.",
+                "Decide if the events described in this article suggest an increase in conflict intensity or a change towards peace.",
+                "Assign '-' in case of events making peace more likely, '+' if the described events increase conflict, or '0' if it is hard to tell.",
+                "Return a single character: -, +, or 0.")
+
+prompt_war_alt <- prompt_war_alt %>% paste(collapse = " ")
+
+# preparing batches from NYT articles - WAR/PEACE
+text <- ''
+for (i in 1:n){
+  json <- paste0('{"custom_id": "req-war-',i,'", "method": "POST",
+                 "url": "/v1/chat/completions", 
+                 "body": {"model": "gpt-4o-mini",
+                 "messages": [{"role": "system", "content": "',
+                 prompt_war_alt, '"},
+                 {"role": "user", "content": "', articles[i], '"}],
+                 "temperature": 0.00,
+                 "max_tokens": 2000}}')
+  json <- str_remove_all(json, "\n") %>% str_squish()
+  text <- paste(text, '\n', json)
+}
+
+# write in jsonl file
+text <- str_trim(text, side = "both")
+utf8 <- enc2utf8(text)
+con <- file("batches/sent_war_alt.jsonl", open = "w+", encoding = "UTF-8")
+writeLines(utf8, con = con)
+close(con)
+
+
+
+
 
 # sample of articles for human annotation
 
