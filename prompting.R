@@ -19,6 +19,7 @@ library(lubridate)
 data_UKR <- rbind(data_1, data_2, data_3, data_4) %>% unique() %>% select(-X) %>% slice(-1) %>%
   mutate(date = str_remove(date, "\\.")) %>% 
   mutate(date = str_remove(date, "\\,")) %>% 
+  mutate(date = str_replace(date, "Sept", "9")) %>% 
   mutate(date = mdy(date)) %>% 
   mutate(author = str_remove(author, "By ")) %>%
   filter(!is.na(date))
@@ -69,6 +70,15 @@ prompt_reason <- prompt_reason %>% paste(collapse = " ")
 articles <- full_data$text
 n <- length(articles)
 
+# patch
+data <- data %>%
+  mutate(header = if_else(str_ends(header, "\\."), header, paste0(header, "."))) %>%
+  mutate(text = paste(header, desc))
+
+full_data$id <- 1:nrow(full_data)
+articles <- data$text[-1]
+n <- 42
+
 # preparing batches from NYT articles
 text <- ''
 for (i in 1:n){
@@ -87,7 +97,7 @@ for (i in 1:n){
 # write in jsonl file
 text <- str_trim(text, side = "both")
 utf8 <- enc2utf8(text)
-con <- file("batches/sent_simple.jsonl", open = "w+", encoding = "UTF-8")
+con <- file("batches/sent_simple_patch.jsonl", open = "w+", encoding = "UTF-8")
 writeLines(utf8, con = con)
 close(con)
 
@@ -138,7 +148,7 @@ for (i in 1:n){
                  "url": "/v1/chat/completions", 
                  "body": {"model": "gpt-4o-mini",
                  "messages": [{"role": "system", "content": "',
-                 prompt_war_alt, '"},
+                 prompt_war, '"},
                  {"role": "user", "content": "', articles[i], '"}],
                  "temperature": 0.00,
                  "max_tokens": 2000}}')
@@ -149,7 +159,7 @@ for (i in 1:n){
 # write in jsonl file
 text <- str_trim(text, side = "both")
 utf8 <- enc2utf8(text)
-con <- file("batches/sent_war_alt.jsonl", open = "w+", encoding = "UTF-8")
+con <- file("batches/sent_war_patch.jsonl", open = "w+", encoding = "UTF-8")
 writeLines(utf8, con = con)
 close(con)
 
@@ -178,7 +188,7 @@ for (i in 1:n){
                  "url": "/v1/chat/completions", 
                  "body": {"model": "gpt-4o-mini",
                  "messages": [{"role": "system", "content": "',
-                 prompt_sides_alt, '"},
+                 prompt_sides, '"},
                  {"role": "user", "content": "', articles[i], '"}],
                  "temperature": 0.00,
                  "max_tokens": 2000}}')
@@ -189,7 +199,7 @@ for (i in 1:n){
 # write in jsonl file
 text <- str_trim(text, side = "both")
 utf8 <- enc2utf8(text)
-con <- file("batches/sent_sides_alt.jsonl", open = "w+", encoding = "UTF-8")
+con <- file("batches/sent_sides_patch.jsonl", open = "w+", encoding = "UTF-8")
 writeLines(utf8, con = con)
 close(con)
 
@@ -216,6 +226,7 @@ library(jsonlite)
 
 # SIMPLE
 filename <- "GPT sent/simple sent.jsonl"
+#filename <- "GPT sent/simple patch.jsonl"
 
   con <- file(filename, open = "r", encoding = "UTF-8")
   file <- readLines(con = con)
@@ -261,18 +272,129 @@ sent_reason <- sent_reason %>%
   select(id, reason, expl)
 
 
+# WAR 
+filename <- "GPT sent/war sent.jsonl"
+#filename <- "GPT sent/war patch.jsonl"
+
+con <- file(filename, open = "r", encoding = "UTF-8")
+file <- readLines(con = con)
+close(con)
+
+sent_war <- lapply(file, function(x){
+  results <- fromJSON(x)
+  df <- data.frame(
+    id = results$custom_id,
+    text = results[["response"]][["body"]][["choices"]][["message"]][["content"]]
+  )}) %>% bind_rows()
+
+
+
+sent_war <- sent_war %>% 
+  mutate(id = as.numeric(str_remove(id, "req-war-"))) %>%
+  rename(war = text)
+
+
+# WAR ALT
+filename <- "GPT sent/war sent alt.jsonl"
+
+con <- file(filename, open = "r", encoding = "UTF-8")
+file <- readLines(con = con)
+close(con)
+
+sent_war_alt <- lapply(file, function(x){
+  results <- fromJSON(x)
+  df <- data.frame(
+    id = results$custom_id,
+    text = results[["response"]][["body"]][["choices"]][["message"]][["content"]]
+  )}) %>% bind_rows()
+
+
+
+sent_war_alt <- sent_war_alt %>% 
+  mutate(id = as.numeric(str_remove(id, "req-war-"))) %>%
+  rename(war_alt = text)
+
+
+# SIDES
+filename <- "GPT sent/sides sent.jsonl"
+#filename <- "GPT sent/sides patch.jsonl"
+
+con <- file(filename, open = "r", encoding = "UTF-8")
+file <- readLines(con = con)
+close(con)
+
+sent_sides <- lapply(file, function(x){
+  results <- fromJSON(x)
+  df <- data.frame(
+    id = results$custom_id,
+    text = results[["response"]][["body"]][["choices"]][["message"]][["content"]]
+  )}) %>% bind_rows()
+
+
+
+sent_sides <- sent_sides %>% 
+  mutate(id = as.numeric(str_remove(id, "req-war-"))) %>%
+  rename(sides = text)
+
+
+# SIDES ALT
+filename <- "GPT sent/sides sent alt.jsonl"
+
+con <- file(filename, open = "r", encoding = "UTF-8")
+file <- readLines(con = con)
+close(con)
+
+sent_sides_alt <- lapply(file, function(x){
+  results <- fromJSON(x)
+  df <- data.frame(
+    id = results$custom_id,
+    text = results[["response"]][["body"]][["choices"]][["message"]][["content"]]
+  )}) %>% bind_rows()
+
+
+
+sent_sides_alt <- sent_sides_alt %>% 
+  mutate(id = as.numeric(str_remove(id, "req-war-"))) %>%
+  rename(sides_alt = text)
+
+
+
+
+
+
 
 
 # join with article data
 sentiment_data <- full_data %>% left_join(sent_simple, by = "id") %>% 
   left_join(sent_reason, by = "id") %>% left_join(sample_done, by = "id") %>% 
+  left_join(sent_war, by = "id") %>% left_join(sent_war_alt, by = "id") %>%
+  left_join(sent_sides, by = "id") %>% left_join(sent_sides_alt, by = "id") %>%
   mutate(date = as.Date(date, format = "%Y-%m-%d")) %>%
-  mutate(gpt_match = if_else(simple == reason, TRUE, FALSE))
+  mutate(gpt_match = if_else(simple == reason, TRUE, FALSE)) %>% # check if simple and reasoning are the same
+  mutate(war_alt = if_else(war_alt == "+", "-", if_else(war_alt == "-", "+", war_alt))) %>%
+  mutate(sides_alt = if_else(sides_alt == "+", "-", if_else(sides_alt == "-", "+", sides_alt))) %>%
+  mutate(war_match = if_else(war == war_alt, TRUE, FALSE)) %>%
+  mutate(sides_match = if_else(sides == sides_alt, TRUE, FALSE))
   
 sum(sentiment_data$gpt_match)/4972
+sum(sentiment_data$war_match)/4972
+sum(sentiment_data$sides_match)/4972
 
 unique(sentiment_data$simple)
 unique(sentiment_data$reason)
+
+
+# join patch
+patch_data <- data %>% slice(-1) %>% mutate(date = str_remove(date, "\\.")) %>% 
+  mutate(date = str_remove(date, "\\,")) %>% 
+  mutate(date = str_replace(date, "Sept", "9")) %>%
+  mutate(date = mdy(date)) %>% 
+  mutate(author = str_remove(author, "By ")) %>%
+  filter(!is.na(date))
+
+patch_data <- patch_data %>% mutate(id = 1:42) %>% 
+  left_join(sent_simple, by = "id") %>% left_join(sent_war, by = "id") %>% 
+  left_join(sent_sides, by = "id")
 
 
 # check which is more aligned with human annotation
@@ -310,3 +432,36 @@ sentiment_daily %>% ggplot(aes(x = date, y = sent)) + geom_line()
 
 write.csv(sentiment_data, "NYT_articles_with_sentiment.csv", row.names = F)
 write.csv(sentiment_daily, "NYT_sentiment_daily.csv", row.names = F)
+
+
+
+
+
+# DATA FRAME WITH ALL TYPES OF INDICATORS
+
+data_frame <- sentiment_data %>% select(id, date, simple, war, sides) %>%
+  pivot_longer(simple:sides, names_to = "type", values_to = "value") %>%
+  mutate(value = if_else(value == "+", 1, if_else(value == "-", -1, 0))) %>%
+  group_by(date, type) %>% summarise(
+    daily = mean(value),
+    n = n()
+  )
+
+patch_data <- patch_data %>% select(id, date, simple, war, sides) %>%
+  pivot_longer(simple:sides, names_to = "type", values_to = "value") %>%
+  mutate(value = if_else(value == "+", 1, if_else(value == "-", -1, 0))) %>%
+  group_by(date, type) %>% summarise(
+    daily = mean(value)
+  )
+  
+data_frame <- rbind(data_frame, patch_data)
+
+data_frame %>% #filter(date >= as.Date("2023-08-20") & date <= as.Date("2023-09-20")) %>%
+  ggplot(aes(x = date, y = daily)) + geom_line() +
+  facet_wrap(~type, nrow = 3, scales = "free")
+
+data_frame %>% #filter(date >= as.Date("2023-08-20") & date <= as.Date("2023-09-20")) %>%
+  ggplot(aes(x = date, y = n)) + geom_line()
+
+
+unique(data_frame$date)

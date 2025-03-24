@@ -10,6 +10,9 @@ end_date <- as.Date("2023-07-27")
 start_date <- as.Date("2025-02-11")
 end_date <- as.Date("2025-03-19")
 
+# missed part
+start_date <- as.Date("2024-09-01")
+end_date <- as.Date("2024-09-12")
 
 rD <- rsDriver(browser="firefox", port=4570L, verbose=F, chromever = NULL)
 remDr <- rD[["client"]]
@@ -51,7 +54,7 @@ repeat{
   if(date_1 >= end_date) break
 }
 
-write.csv(data, "nyt_archive_Ukraine_4.csv")
+write.csv(data, "nyt_archive_Ukraine_5.csv")
 
 remDr$close()
 rD$client$closeServer()
